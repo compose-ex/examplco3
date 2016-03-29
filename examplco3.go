@@ -1,7 +1,11 @@
 package main
 
 import (
+	"crypto/tls"
+	"crypto/x509"
+	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -15,6 +19,7 @@ var (
 	peerlist = app.Flag("peers", "etcd peers").Default("http://127.0.0.1:4001,http://127.0.0.1:2379").OverrideDefaultFromEnvar("EX_PEERS").String()
 	username = app.Flag("user", "etcd User").OverrideDefaultFromEnvar("EX_USER").String()
 	password = app.Flag("pass", "etcd Password").OverrideDefaultFromEnvar("EX_PASS").String()
+	cafile   = app.Flag("cacert", "CA Certificate").OverrideDefaultFromEnvar("EX_CERT").String()
 
 	config       = app.Command("config", "Change config data")
 	configserver = config.Arg("server", "Server name").Required().String()
@@ -48,9 +53,23 @@ func main() {
 
 	peers := strings.Split(*peerlist, ",")
 
+	caCert, err := ioutil.ReadFile(*cafile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+
+	// Setup HTTPS client
+	tlsConfig := &tls.Config{
+		RootCAs: caCertPool,
+	}
+
+	transport := &http.Transport{TLSClientConfig: tlsConfig}
+
 	cfg := client.Config{
 		Endpoints:               peers,
-		Transport:               client.DefaultTransport,
+		Transport:               transport,
 		HeaderTimeoutPerRequest: time.Minute,
 		Username:                *username,
 		Password:                *password,
