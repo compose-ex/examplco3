@@ -53,20 +53,27 @@ func main() {
 
 	peers := strings.Split(*peerlist, ",")
 
+	// Read the certificate into a file
 	caCert, err := ioutil.ReadFile(*cafile)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// Create a certificate pool
 	caCertPool := x509.NewCertPool()
+	// and add the freshly read certificate to the new pool
 	caCertPool.AppendCertsFromPEM(caCert)
 
-	// Setup HTTPS client
+	// Create a TLS configuration structure
+	// with the certificate pool as it's list of certificate authorities
 	tlsConfig := &tls.Config{
 		RootCAs: caCertPool,
 	}
 
+	// Then create a HTTP transport with that configuration
 	transport := &http.Transport{TLSClientConfig: tlsConfig}
 
+	// When we create the etcd client configuration, use that transport
 	cfg := client.Config{
 		Endpoints:               peers,
 		Transport:               transport,
@@ -75,6 +82,7 @@ func main() {
 		Password:                *password,
 	}
 
+	// And create your client as normal.
 	etcdclient, err := client.New(cfg)
 
 	if err != nil {
